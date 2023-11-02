@@ -7,8 +7,6 @@ export const calculateTaxesService = (
   operationDTOs: OperationDTO[]
 ): TaxResponseDTO[] => {
   const operations = operationDTOs.map(mapDTOToOperation);
-
   const taxes = calculateTaxes(operations);
-
   return taxes.map(mapTaxToDTO);
 };

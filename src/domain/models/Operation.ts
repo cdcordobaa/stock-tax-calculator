@@ -1,71 +1,111 @@
 // Operation.ts
 
 import { OperationDTO } from "../../application/dtos/OperationDTO";
-
-const TAX_RATE = 0.2;
-const TAX_EXEMPTION_THRESHOLD = 20000;
+import { Context, calculateWeightedAverage } from "./TradingContex";
 
 export enum OperationType {
   BUY = "buy",
   SELL = "sell",
 }
-
 export interface Operation {
-  operation: OperationType;
-  unitCost: number;
+  type: OperationType;
+  price: number;
   quantity: number;
 }
 
-export interface Context {
-  currentQuantity: number;
-  currentAveragePrice: number;
-  accumulatedLoss: number;
-}
-
 export const mapDTOToOperation = (dto: OperationDTO): Operation => ({
-  operation: dto.operation as OperationType,
-  unitCost: dto["unit-cost"],
+  type: dto.operation as OperationType,
+  price: dto["unit-cost"],
   quantity: dto.quantity,
 });
 
-export const calculateWeightedAverage = (
+export function processBuyOperation(
   context: Context,
-  newOperation: Operation
-): number => {
-  const denominator = context.currentQuantity + newOperation.quantity;
-  if (denominator === 0) return 0; // Avoid division by zero
+  price: number,
+  quantity: number
+): Context {
+  return {
+    ...context,
+    currentAveragePrice: calculateWeightedAverage(context, price, quantity),
+    currentQuantity: context.currentQuantity + quantity,
+  };
+}
 
-  return (
-    (context.currentQuantity * context.currentAveragePrice +
-      newOperation.unitCost * newOperation.quantity) /
-    denominator
-  );
+export function processSellOperation(
+  context: Context,
+  price: number,
+  quantity: number
+): Context {
+  if (quantity > context.currentQuantity) {
+    throw new Error("Sell quantity exceeds the current quantity");
+  }
+
+  const revenue = price * quantity;
+  const cost = context.currentAveragePrice * quantity;
+  let accumulatedLoss = context.accumulatedLoss;
+  let accumulatedProfit = context.accumulatedProfit;
+
+  if (revenue < cost) {
+    accumulatedLoss += cost - revenue;
+  } else {
+    accumulatedProfit += revenue - cost;
+  }
+
+  return {
+    ...context,
+    currentQuantity: context.currentQuantity - quantity,
+    accumulatedLoss,
+    accumulatedProfit,
+  };
+}
+
+export const calculateProfitOrLossPerUnit = (
+  price: number,
+  averagePrice: number
+): number => {
+  return price - averagePrice;
 };
 
-export const computeSellTax = (
-  operation: Operation,
+export const calculateTotalProfitOrLoss = (
+  profitOrLossPerUnit: number,
+  quantity: number
+): number => {
+  return profitOrLossPerUnit * quantity;
+};
+
+export const offsetProfitWithAccumulatedLoss = (
+  totalProfitOrLoss: number,
   context: Context
 ): number => {
-  const profitOrLossPerUnit = operation.unitCost - context.currentAveragePrice;
-  let totalProfitOrLoss = profitOrLossPerUnit * operation.quantity;
-
-  // Offset profit with accumulated loss
   if (totalProfitOrLoss > 0 && context.accumulatedLoss > 0) {
     const deduction = Math.min(totalProfitOrLoss, context.accumulatedLoss);
-    totalProfitOrLoss -= deduction;
     context.accumulatedLoss -= deduction;
+    return totalProfitOrLoss - deduction;
   }
+  return totalProfitOrLoss;
+};
 
-  // Update accumulated loss if there's a loss
-  if (totalProfitOrLoss < 0) {
-    context.accumulatedLoss += Math.abs(totalProfitOrLoss);
-    return 0;
-  }
+export const isLoss = (totalProfitOrLoss: number): boolean => {
+  return totalProfitOrLoss < 0;
+};
 
-  // Tax exemption check
-  if (operation.unitCost * operation.quantity <= TAX_EXEMPTION_THRESHOLD) {
-    return 0;
-  }
+export const updateAccumulatedLoss = (
+  context: Context,
+  totalProfitOrLoss: number
+): void => {
+  context.accumulatedLoss += Math.abs(totalProfitOrLoss);
+};
 
-  return TAX_RATE * totalProfitOrLoss;
+export const isTaxExempt = (
+  operation: Operation,
+  taxExemption: number
+): boolean => {
+  return operation.price * operation.quantity <= taxExemption;
+};
+
+export const calculateTaxAmount = (
+  totalProfitOrLoss: number,
+  taxRate: number
+): number => {
+  return taxRate * totalProfitOrLoss;
 };

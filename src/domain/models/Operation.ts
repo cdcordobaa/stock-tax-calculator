@@ -89,12 +89,7 @@ export const isLoss = (totalProfitOrLoss: number): boolean => {
   return totalProfitOrLoss < 0;
 };
 
-export const updateAccumulatedLoss = (
-  context: Context,
-  totalProfitOrLoss: number
-): void => {
-  context.accumulatedLoss += Math.abs(totalProfitOrLoss);
-};
+
 
 export const isTaxExempt = (
   operation: Operation,

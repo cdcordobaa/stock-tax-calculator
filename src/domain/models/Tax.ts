@@ -12,7 +12,6 @@ import {
   offsetProfitWithAccumulatedLoss,
   processBuyOperation,
   processSellOperation,
-  updateAccumulatedLoss,
 } from "./Operation";
 import { Context, createContext } from "./TradingContex";
 
@@ -30,9 +29,11 @@ export const calculateTaxes = (operations: Operation[]): Tax[] => {
   const initialContext: Context = createContext();
 
   const taxes = operations.reduce(
-    (acc, operation) => {
+    (acc, operation, idx) => {
       let updatedContext: Context;
       let taxAmount = 0;
+
+      console.log("context for: ", idx, operation, acc.context);
 
       const operationTypeHandlers = {
         [OperationType.BUY]: () => {
@@ -65,7 +66,10 @@ export const calculateTaxes = (operations: Operation[]): Tax[] => {
   return taxes.taxes;
 };
 
-export const computeSellTax = (operation: Operation, context: Context): number => {
+export const computeSellTax = (
+  operation: Operation,
+  context: Context
+): number => {
   const { price, quantity } = operation;
   const profitOrLossPerUnit = calculateProfitOrLossPerUnit(
     price,
@@ -82,7 +86,6 @@ export const computeSellTax = (operation: Operation, context: Context): number =
   );
 
   if (isLoss(totalProfitOrLoss)) {
-    updateAccumulatedLoss(context, totalProfitOrLoss);
     return 0;
   }
 

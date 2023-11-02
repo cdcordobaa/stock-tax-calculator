@@ -90,7 +90,6 @@ export const isLoss = (totalProfitOrLoss: number): boolean => {
 };
 
 
-
 export const isTaxExempt = (
   operation: Operation,
   taxExemption: number

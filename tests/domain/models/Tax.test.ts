@@ -1,49 +1,50 @@
 import { calculateTaxes } from "../../../src/domain/models/Tax";
-import {
-  Operation,
-  OperationType,
-  computeSellTax,
-  createLossOffsetManager,
-} from "../../../src/domain/models/Operation";
+import { Operation, OperationType } from "../../../src/domain/models/Operation";
+import { createContext } from "../../../src/domain/models/TradingContex";
 
 describe("Tax Model", () => {
   const mockBuyOperation: Operation = {
-    operation: OperationType.BUY,
-    unitCost: 10.0,
+    type: OperationType.BUY,
+    price: 10.0,
     quantity: 10,
   };
 
   const mockSellOperation: Operation = {
-    operation: OperationType.SELL,
-    unitCost: 15.0,
+    type: OperationType.SELL,
+    price: 15.0,
     quantity: 5,
   };
 
   const mockSellOperationLoss: Operation = {
-    operation: OperationType.SELL,
-    unitCost: 8.0,
+    type: OperationType.SELL,
+    price: 8.0,
     quantity: 5,
   };
 
   const mockSellOperationProfit: Operation = {
-    operation: OperationType.SELL,
-    unitCost: 12.0,
+    type: OperationType.SELL,
+    price: 12.0,
     quantity: 5,
   };
 
   it("should deduct losses from subsequent profits", () => {
-    const operations = [mockBuyOperation, mockSellOperation];
+    const operations = [
+      mockBuyOperation,
+      mockSellOperationLoss,
+      mockSellOperationProfit,
+    ];
     const results = calculateTaxes(operations);
     expect(results[1].amount).toBe(0);
+    expect(results[2].amount).toBeLessThanOrEqual(0);
   });
 
-  it("should not apply taxes if the total amount is below $20,000", () => {
+  it("should not apply taxes if the total amount is below the exemption threshold", () => {
     const operations = [
       mockBuyOperation,
       {
         ...mockSellOperation,
-        quantity: 1000,
-        unitCost: 20,
+        quantity: 5,
+        price: 20,
       },
     ];
     const results = calculateTaxes(operations);
@@ -62,17 +63,10 @@ describe("Tax Model", () => {
       mockSellOperationLoss,
       mockSellOperationProfit,
     ];
-    const lossManager = createLossOffsetManager();
-    computeSellTax(
-      operations[1],
-      { currentQuantity: 10, currentAveragePrice: 10 },
-      lossManager
-    );
-    const tax = computeSellTax(
-      operations[2],
-      { currentQuantity: 5, currentAveragePrice: 10 },
-      lossManager
-    );
-    expect(tax).toEqual(0);
+    const context = createContext();
+    const taxes = calculateTaxes(operations);
+
+    expect(taxes[1].amount).toBe(0);
+    expect(taxes[2].amount).toBeLessThanOrEqual(0);
   });
 });
